@@ -1,0 +1,26 @@
+[
+  {
+    "id": "type_basic",
+    "name": "basic",
+    "displayName": "Basic Computer",
+    "description": "Standard desktop for basic tasks",
+    "color": "#3b82f6",
+    "icon": "💻"
+  },
+  {
+    "id": "type_gaming",
+    "name": "gaming",
+    "displayName": "Gaming Computer",
+    "description": "High-performance desktop for gaming",
+    "color": "#8b5cf6",
+    "icon": "🎮"
+  },
+  {
+    "id": "type_design",
+    "name": "design",
+    "displayName": "Design Computer",
+    "description": "Powerful desktop for graphic design and video editing",
+    "color": "#ec4899",
+    "icon": "🎨"
+  }
+]

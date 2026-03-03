@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Desktop",
+    "slug": "desktop",
+    "duration": 30,
+    "description": "hello",
+    "location": "office ",
+    "userId": "demo-user-id",
+    "id": "evt_1772454683751_7a7fei49m",
+    "createdAt": "2026-03-02T12:31:23.751Z",
+    "updatedAt": "2026-03-02T12:31:23.751Z"
+  }
+]

@@ -24,3 +24,17 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Make all input and textarea text dark and readable */
+input,
+textarea,
+select {
+  color: #111827 !important;
+  font-weight: 500;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+  font-weight: 400;
+}
