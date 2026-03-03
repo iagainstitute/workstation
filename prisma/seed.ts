@@ -37,7 +37,6 @@ async function main() {
         endTime: "17:00",
       },
     ],
-    skipDuplicates: true,
   });
 
   console.log("✅ Created default availability (Mon-Fri 9AM-5PM)");
