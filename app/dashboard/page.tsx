@@ -5,13 +5,28 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Plus } from "lucide-react";
 import { api } from "@/trpc/react";
 
+interface Booking {
+  id: string;
+  startTime: string;
+  status: string;
+}
+
+interface EventType {
+  id: string;
+  title: string;
+  slug: string;
+  duration: number;
+  description?: string | null;
+  color?: string;
+}
+
 export default function DashboardPage() {
   const { data: eventTypes, isLoading } = api.eventType.list.useQuery();
   const { data: bookings } = api.booking.list.useQuery();
 
   // Filter upcoming bookings on client side
   const upcomingBookings = bookings?.filter(
-    (b) => b.status === "ACCEPTED" && new Date(b.startTime) >= new Date()
+    (b: Booking) => b.status === "ACCEPTED" && new Date(b.startTime) >= new Date()
   ) || [];
 
   return (
@@ -70,7 +85,7 @@ export default function DashboardPage() {
           <div className="mt-6 text-center text-gray-600">Loading...</div>
         ) : eventTypes && eventTypes.length > 0 ? (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {eventTypes.map((eventType) => (
+            {eventTypes.map((eventType: EventType) => (
               <Link
                 key={eventType.id}
                 href={`/dashboard/event-types/${eventType.id}`}

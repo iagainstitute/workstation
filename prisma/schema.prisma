@@ -38,12 +38,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -79,7 +79,7 @@ model EventType {
   title                 String
   slug                  String
   duration              Int      // in minutes
-  description           String?  @db.Text
+  description           String?
   locations             Json?    // Array of location options
   bufferTime            Int      @default(0) // in minutes
   minimumBookingNotice  Int      @default(120) // in minutes
@@ -118,9 +118,9 @@ model Booking {
   attendeeEmail     String
   attendeePhone     String?
   attendeeTimezone  String
-  attendeeNotes     String?       @db.Text
+  attendeeNotes     String?
   status            BookingStatus @default(ACCEPTED)
-  cancelReason      String?       @db.Text
+  cancelReason      String?
   meetingUrl        String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -138,7 +138,7 @@ model Booking {
 model Availability {
   id        String   @id @default(cuid())
   userId    String
-  days      Int[]    // 0 = Sunday, 1 = Monday, etc.
+  days      String   // Comma-separated days: "0,1,2,3,4" (0 = Sunday, 1 = Monday, etc.)
   startTime String   // HH:mm format
   endTime   String   // HH:mm format
   date      DateTime? // For date-specific overrides
@@ -166,8 +166,8 @@ model Calendar {
   primary               Boolean      @default(false)
   integrationAccountId  String?      // Link to Account model
   credentials           Json?        // Encrypted credentials
-  refreshToken          String?      @db.Text
-  accessToken           String?      @db.Text
+  refreshToken          String?
+  accessToken           String?
   expiresAt             DateTime?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt

@@ -1,20 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api } from "@/trpc/react";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Monitor, Clock, User, Mail, Phone, Calendar, CheckCircle2 } from "lucide-react";
 import dayjs from "dayjs";
 
 const bookingSchema = z.object({
-  studentName: z.string().min(1, "Name is required").max(100),
-  studentEmail: z.string().email("Invalid email address"),
-  studentPhone: z.string().optional(),
   purpose: z.string().optional(),
   notes: z.string().max(500).optional(),
 });
@@ -30,6 +28,20 @@ export default function DesktopBookingPage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [duration, setDuration] = useState(60);
   const [allocationId, setAllocationId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get current user
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      } else {
+        router.push('/student/login');
+      }
+    };
+    getUser();
+  }, [router]);
 
   const { data: desktopTypes } = api.desktop.getTypes.useQuery();
   const { data: availableDesktops } = api.desktop.listAvailable.useQuery(
@@ -86,15 +98,13 @@ export default function DesktopBookingPage() {
   const timeSlots = generateTimeSlots();
 
   const onSubmit = async (data: BookingForm) => {
-    if (!selectedDesktop || !selectedDate || !selectedTime) return;
+    if (!selectedDesktop || !selectedDate || !selectedTime || !userId) return;
 
-    const startTime = new Date(`${selectedDate}T${selectedTime}`);
+    const startTime = new Date(`${selectedDate}T${selectedTime}`).toISOString();
 
     await createAllocationMutation.mutateAsync({
       desktopId: selectedDesktop.id,
-      studentName: data.studentName,
-      studentEmail: data.studentEmail,
-      studentPhone: data.studentPhone,
+      studentId: userId,
       startTime,
       durationMinutes: duration,
       purpose: data.purpose,
@@ -304,33 +314,18 @@ export default function DesktopBookingPage() {
             }} variant="outline" className="mb-6">
               ← Back
             </Button>
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Step 4: Enter Your Details</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Step 4: Confirm Booking</h2>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div>
-                <label className="block text-xl font-medium text-gray-900 mb-2">
-                  👤 Your Name <span className="text-red-500">*</span>
-                </label>
-                <Input {...register("studentName")} placeholder="Enter your full name" className="h-14 text-lg" />
-                {errors.studentName && <p className="text-red-500 text-sm mt-1">{errors.studentName.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xl font-medium text-gray-900 mb-2">
-                  📧 Your Email <span className="text-red-500">*</span>
-                </label>
-                <Input {...register("studentEmail")} type="email" placeholder="your@email.com" className="h-14 text-lg" />
-                {errors.studentEmail && <p className="text-red-500 text-sm mt-1">{errors.studentEmail.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xl font-medium text-gray-900 mb-2">📱 Your Phone (Optional)</label>
-                <Input {...register("studentPhone")} placeholder="Phone number" className="h-14 text-lg" />
-              </div>
-
-              <div>
                 <label className="block text-xl font-medium text-gray-900 mb-2">📝 What will you use it for?</label>
                 <Input {...register("purpose")} placeholder="e.g., Homework, Gaming, Learning" className="h-14 text-lg" />
+              </div>
+
+              <div>
+                <label className="block text-xl font-medium text-gray-900 mb-2">📋 Additional Notes (Optional)</label>
+                <Input {...register("notes")} placeholder="Any special requests?" className="h-14 text-lg" />
+                {errors.notes && <p className="text-red-500 text-sm mt-1">{errors.notes.message}</p>}
               </div>
 
               <Button

@@ -7,6 +7,16 @@ import { api } from "@/trpc/react";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, Clock, Copy, Edit, Trash2, ExternalLink } from "lucide-react";
 
+interface EventType {
+  id: string;
+  title: string;
+  slug: string;
+  duration: number;
+  description?: string | null;
+  location?: string | null;
+  color?: string;
+}
+
 export default function EventTypesPage() {
   const { data: session } = useSession();
   const utils = api.useUtils();
@@ -73,7 +83,7 @@ export default function EventTypesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {eventTypes.map((eventType) => (
+          {eventTypes.map((eventType: EventType) => (
             <div
               key={eventType.id}
               className="bg-white rounded-2xl border-2 border-gray-100 p-6 hover:border-blue-200 hover:shadow-lg transition-all"

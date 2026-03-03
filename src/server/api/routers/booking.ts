@@ -179,7 +179,8 @@ export const bookingRouter = createTRPCRouter({
             startTime: booking.startTime,
             endTime: booking.endTime,
             organizerName: booking.eventType.user.name || booking.eventType.user.username,
-            reason: input.reason || "Cancelled by organizer",
+            organizerEmail: booking.eventType.user.email,
+            cancelReason: input.reason || "Cancelled by organizer",
           });
         } catch (error) {
           console.error("Failed to send cancellation email:", error);
@@ -219,7 +220,8 @@ export const bookingRouter = createTRPCRouter({
               startTime: booking.startTime,
               endTime: booking.endTime,
               organizerName: "Demo Admin",
-              reason: input.reason || "Cancelled by organizer",
+              organizerEmail: "admin@example.com",
+              cancelReason: input.reason || "Cancelled by organizer",
             });
           }
         } catch (error) {

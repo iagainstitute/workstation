@@ -5,6 +5,15 @@ import Link from "next/link";
 import { api } from "@/trpc/react";
 import { Clock, Calendar, ArrowRight } from "lucide-react";
 
+interface EventType {
+  id: string;
+  title: string;
+  slug: string;
+  duration: number;
+  description: string | null;
+  location?: string | null;
+}
+
 export default function PublicProfilePage() {
   const params = useParams();
   const username = params.username as string;
@@ -42,7 +51,7 @@ export default function PublicProfilePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {eventTypes.map((eventType) => (
+            {eventTypes.map((eventType: EventType) => (
               <Link key={eventType.id} href={`/${username}/${eventType.slug}`}>
                 <div className="bg-white rounded-2xl border-2 border-gray-100 p-6 hover:border-blue-300 hover:shadow-xl transition-all cursor-pointer group">
                   <div className="flex items-start justify-between mb-4">

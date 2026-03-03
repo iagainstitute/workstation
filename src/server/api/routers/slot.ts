@@ -8,6 +8,22 @@ import timezone from "dayjs/plugin/timezone";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+interface Availability {
+  id: string;
+  userId: string;
+  days: string; // Comma-separated days
+  startTime: string;
+  endTime: string;
+  date: Date | null;
+}
+
+interface Booking {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  status: string;
+}
+
 export const slotRouter = createTRPCRouter({
   getAvailableSlots: publicProcedure
     .input(
@@ -82,7 +98,9 @@ export const slotRouter = createTRPCRouter({
         const dateStr = currentDate.format("YYYY-MM-DD");
 
         // Find availability for this day
-        const dayAvailability = availability.filter((a) => a.days.includes(dayOfWeek));
+        const dayAvailability = availability.filter((a: Availability) =>
+          a.days.split(',').map(Number).includes(dayOfWeek)
+        );
 
         const daySlots: string[] = [];
 
@@ -116,7 +134,7 @@ export const slotRouter = createTRPCRouter({
             }
 
             // Check for conflicts with existing bookings
-            const hasConflict = existingBookings.some((booking) => {
+            const hasConflict = existingBookings.some((booking: Booking) => {
               const bookingStart = dayjs(booking.startTime);
               const bookingEnd = dayjs(booking.endTime);
 

@@ -8,6 +8,22 @@ import dayjs from "dayjs";
 
 type BookingStatus = "upcoming" | "past" | "cancelled";
 
+interface Booking {
+  id: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  attendeeName: string;
+  attendeeEmail: string;
+  attendeeNotes?: string;
+  eventType: {
+    title: string;
+    duration: number;
+    location?: string;
+  };
+  cancelReason?: string;
+}
+
 export default function BookingsPage() {
   const [activeTab, setActiveTab] = useState<BookingStatus>("upcoming");
   const utils = api.useUtils();
@@ -32,11 +48,11 @@ export default function BookingsPage() {
 
     switch (activeTab) {
       case "upcoming":
-        return bookings.filter((b) => b.status === "ACCEPTED" && new Date(b.startTime) >= now);
+        return bookings.filter((b: Booking) => b.status === "ACCEPTED" && new Date(b.startTime) >= now);
       case "past":
-        return bookings.filter((b) => b.status === "ACCEPTED" && new Date(b.startTime) < now);
+        return bookings.filter((b: Booking) => b.status === "ACCEPTED" && new Date(b.startTime) < now);
       case "cancelled":
-        return bookings.filter((b) => b.status === "CANCELLED");
+        return bookings.filter((b: Booking) => b.status === "CANCELLED");
       default:
         return [];
     }
@@ -97,7 +113,7 @@ export default function BookingsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredBookings.map((booking) => (
+          {filteredBookings.map((booking: Booking) => (
             <div
               key={booking.id}
               className="bg-white rounded-2xl border-2 border-gray-100 p-6 hover:border-blue-200 hover:shadow-lg transition-all"
