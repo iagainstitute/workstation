@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Cal Clone - Open Source Scheduling",
-  description: "Schedule meetings seamlessly with Cal Clone",
+  title: "Workstation",
+  description: "Workstation Schedule Desktop management",
 };
 
 export default function RootLayout({
@@ -21,6 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="logo-dark-23.jpg" />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <Providers>
           <TRPCReactProvider>{children}</TRPCReactProvider>

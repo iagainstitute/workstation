@@ -86,3 +86,13 @@ export interface Profile {
   created_at: string;
   updated_at: string;
 }
+
+export interface AccessCode {
+  id: string;
+  code: string;
+  created_at: string;
+  expires_at: string;
+  used: boolean;
+  used_at?: string;
+  used_by?: string;
+}
