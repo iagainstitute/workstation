@@ -12,9 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LogOut, CheckCircle2, Monitor } from "lucide-react";
+import { LogOut, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function StudentBookingPage() {
   const router = useRouter();
@@ -74,6 +75,72 @@ export default function StudentBookingPage() {
     checkAuth();
   }, []);
 
+  // Real-time subscription to profile changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Subscribe to profile changes for real-time updates
+    const channel = supabase
+      .channel(`profile-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Profile updated:", payload);
+          refreshProfile();
+        }
+      )
+      .subscribe();
+
+    // Also refresh when window gains focus
+    const handleFocus = () => {
+      refreshProfile();
+    };
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [user?.id]);
+
+  const refreshProfile = async () => {
+    if (!user?.id) return;
+
+    try {
+      console.log("🔄 Refreshing profile for user:", user.id);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      console.log("📥 Student Profile fetched from DB:", {
+        name: profile?.full_name,
+        isActive: profile?.is_active,
+        dailyTimeLimit: profile?.daily_time_limit_hours,
+      });
+
+      // Check if student account is active
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut();
+        alert("Your account has been disabled. Please contact the administrator.");
+        router.push("/student/login");
+        return;
+      }
+
+      setStudentProfile(profile);
+      console.log("✅ Profile updated in state");
+    } catch (error) {
+      console.error("❌ Profile refresh error:", error);
+    }
+  };
+
   const checkAuth = async () => {
     try {
       const {
@@ -93,6 +160,14 @@ export default function StudentBookingPage() {
         .select("*")
         .eq("id", user.id)
         .single();
+
+      // Check if student account is active
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut();
+        alert("Your account has been disabled. Please contact the administrator.");
+        router.push("/student/login");
+        return;
+      }
 
       setStudentProfile(profile);
       setLoading(false);
@@ -128,11 +203,20 @@ export default function StudentBookingPage() {
     },
   );
 
-  // Calculate remaining hours
-  const maxHoursPerDay = 3;
+  // Calculate remaining hours using student's custom time limit
+  const maxHoursPerDay = studentProfile?.daily_time_limit_hours || 3;
   const usedHours = todayUsage?.totalHours || 0;
   const remainingHours = Math.max(0, maxHoursPerDay - usedHours);
   const remainingMinutes = Math.round(remainingHours * 60);
+
+  // Debug: Log the calculated values
+  console.log("⏰ Time Limit Calculation:", {
+    profileTimeLimit: studentProfile?.daily_time_limit_hours,
+    maxHoursPerDay,
+    usedHours,
+    remainingHours,
+    remainingMinutes,
+  });
 
   // Filter to only show basic 2D and 3D types (exclude Pro and Ultra)
   const filteredTypes = types?.filter((type: any) => {
@@ -154,6 +238,8 @@ export default function StudentBookingPage() {
     },
     {
       enabled: !!selectedDate && !!selectedTypeId && !!selectedTime,
+      refetchInterval: 1000, // Auto-refresh every 1 second for instant booking status updates
+      refetchOnWindowFocus: true, // Refresh when user comes back to the tab
     },
   );
 
@@ -425,9 +511,13 @@ export default function StudentBookingPage() {
       <div className="max-w-5xl mx-auto mb-6">
         <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Monitor className="w-6 h-6 text-white" />
-            </div>
+            <Image
+              src="/logorm.png"
+              alt="Logo"
+              width={1000}
+              height={1000}
+              className="rounded-lg h-12 w-32 object-contain"
+            />
             <div>
               <h1 className="text-xl font-bold text-gray-900">
                 Book Your Computer

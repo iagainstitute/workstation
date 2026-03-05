@@ -231,7 +231,14 @@ export const allocationRouter = createTRPCRouter({
         const endOfDay = new Date(dateStr);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // Get booking settings
+        // Get student's custom time limit first
+        const { data: studentProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('daily_time_limit_hours')
+          .eq('id', input.studentId)
+          .single();
+
+        // Get booking settings as fallback
         const { data: settings } = await supabaseAdmin
           .from('booking_settings')
           .select('*')
@@ -239,7 +246,8 @@ export const allocationRouter = createTRPCRouter({
           .limit(1)
           .single();
 
-        const maxHoursPerDay = settings?.max_hours_per_day || 3;
+        // Use student's custom limit if set, otherwise use global setting
+        const maxHoursPerDay = studentProfile?.daily_time_limit_hours || settings?.max_hours_per_day || 3;
 
         // Get student's existing bookings for this day
         const { data: studentBookings } = await supabaseAdmin

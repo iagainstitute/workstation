@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/server/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,64 +12,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the access code
-    const { data: accessCode, error: fetchError } = await supabaseAdmin
-      .from("access_codes")
-      .select("*")
-      .eq("code", code.toUpperCase())
-      .single();
+    // Query the access code from database
+    const accessCode = await db.accessCode.findFirst({
+      where: {
+        code: code.toUpperCase(),
+      },
+    });
 
-    if (fetchError || !accessCode) {
+    // Check if code exists
+    if (!accessCode) {
       return NextResponse.json(
         { success: false, message: "Invalid access code" },
-        { status: 404 }
+        { status: 400 }
       );
     }
 
-    // Check if already used
+    // Check if code is already used
     if (accessCode.used) {
       return NextResponse.json(
         { success: false, message: "This code has already been used" },
-        { status: 403 }
+        { status: 400 }
       );
     }
 
-    // Check if expired
+    // Check if code has expired
     const now = new Date();
-    const expiresAt = new Date(accessCode.expires_at);
-
-    if (now > expiresAt) {
+    if (now > accessCode.expiresAt) {
       return NextResponse.json(
         { success: false, message: "This code has expired" },
-        { status: 403 }
+        { status: 400 }
       );
     }
 
     // Mark code as used
-    const { error: updateError } = await supabaseAdmin
-      .from("access_codes")
-      .update({
+    await db.accessCode.update({
+      where: { id: accessCode.id },
+      data: {
         used: true,
-        used_at: new Date().toISOString(),
-      })
-      .eq("id", accessCode.id);
+        usedAt: new Date(),
+      },
+    });
 
-    if (updateError) {
-      console.error("Error updating access code:", updateError);
-      return NextResponse.json(
-        { success: false, message: "Failed to process code" },
-        { status: 500 }
-      );
-    }
+    // Calculate remaining time until expiry
+    const expiresIn = Math.floor(
+      (accessCode.expiresAt.getTime() - now.getTime()) / 1000
+    );
 
-    // Calculate remaining seconds until expiry
-    const remainingSeconds = Math.floor((expiresAt.getTime() - now.getTime()) / 1000);
-
-    // Success
     return NextResponse.json({
       success: true,
       message: "Access code verified successfully",
-      expiresIn: remainingSeconds, // seconds remaining
+      expiresIn,
     });
   } catch (error) {
     console.error("Error verifying access code:", error);

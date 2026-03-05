@@ -104,14 +104,6 @@ export default function AccessGatePage() {
             <p className="mt-1">Contact your administrator to get one.</p>
           </div>
         </div>
-
-        {/* Info Box */}
-        {/* <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Note:</strong> Access codes are valid for 1 hour and can
-            only be used once.
-          </p>
-        </div> */}
       </div>
     </div>
   );
