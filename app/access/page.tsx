@@ -29,7 +29,9 @@ export default function AccessGatePage() {
       if (response.ok && data.success) {
         // Store access token in cookie with dynamic expiry
         const maxAge = data.expiresIn || 3600; // Use returned expiry or default to 1 hour
+        const expiryTime = Date.now() + maxAge * 1000; // Calculate expiry timestamp
         document.cookie = `access_verified=true; path=/; max-age=${maxAge}`;
+        document.cookie = `access_expiry=${expiryTime}; path=/; max-age=${maxAge}`;
         // Redirect to home page - user can now access entire website
         router.push("/");
       } else {
@@ -47,7 +49,7 @@ export default function AccessGatePage() {
       <div className="max-w-md w-full">
         {/* Lock Icon */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full mb-4">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#ee4a62] to-[#f7acb7] rounded-full mb-4">
             <Lock className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -91,7 +93,7 @@ export default function AccessGatePage() {
             <Button
               type="submit"
               disabled={loading || code.length !== 6}
-              className="w-full h-12 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              className="w-full h-12 text-lg rounded-lg bg-[#ee4a62] hover:bg-[#ee4a62]"
             >
               {loading ? "Verifying..." : "Verify & Continue"}
             </Button>

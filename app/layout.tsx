@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { TRPCReactProvider } from "@/trpc/react";
 import { Providers } from "@/components/Providers";
+import { AccessMonitor } from "@/components/AccessMonitor";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -26,6 +27,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <Providers>
+          <AccessMonitor />
           <TRPCReactProvider>{children}</TRPCReactProvider>
         </Providers>
       </body>

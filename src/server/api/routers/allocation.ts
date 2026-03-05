@@ -240,7 +240,6 @@ export const allocationRouter = createTRPCRouter({
           .single();
 
         const maxHoursPerDay = settings?.max_hours_per_day || 3;
-        const maxSessionsPerDay = settings?.max_sessions_per_day || 3;
 
         // Get student's existing bookings for this day
         const { data: studentBookings } = await supabaseAdmin
@@ -252,24 +251,17 @@ export const allocationRouter = createTRPCRouter({
           .eq('status', 'active');
 
         if (studentBookings) {
-          // Check session count
-          if (studentBookings.length >= maxSessionsPerDay) {
-            return {
-              isAvailable: false,
-              reason: `You can only book ${maxSessionsPerDay} sessions per day`,
-            };
-          }
-
-          // Check total hours
+          // Check total hours only (no session count limit)
           const totalMinutes = studentBookings.reduce((sum, b) => sum + (b.duration_minutes || 0), 0);
           const totalHours = totalMinutes / 60;
           const requestedHours = input.durationMinutes / 60;
 
           if (totalHours + requestedHours > maxHoursPerDay) {
             const remainingHours = maxHoursPerDay - totalHours;
+            const remainingMinutes = Math.round(remainingHours * 60);
             return {
               isAvailable: false,
-              reason: `You can only book ${maxHoursPerDay} hours per day. You have ${remainingHours.toFixed(1)} hours remaining.`,
+              reason: `Daily limit exceeded! Maximum ${maxHoursPerDay} hours per day. You have used ${totalHours.toFixed(1)} hours. Only ${remainingMinutes} minutes remaining.`,
             };
           }
         }
