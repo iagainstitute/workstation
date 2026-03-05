@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/server/db";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +13,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Query the access code from database
-    const accessCode = await db.accessCode.findFirst({
-      where: {
-        code: code.toUpperCase(),
-      },
-    });
+    const { data: accessCode, error: fetchError } = await supabaseAdmin
+      .from("access_codes")
+      .select("*")
+      .eq("code", code.toUpperCase())
+      .single();
 
     // Check if code exists
-    if (!accessCode) {
+    if (fetchError || !accessCode) {
       return NextResponse.json(
         { success: false, message: "Invalid access code" },
         { status: 400 }
@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
 
     // Check if code has expired
     const now = new Date();
-    if (now > accessCode.expiresAt) {
+    const expiresAt = new Date(accessCode.expires_at);
+    if (now > expiresAt) {
       return NextResponse.json(
         { success: false, message: "This code has expired" },
         { status: 400 }
@@ -45,17 +46,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark code as used
-    await db.accessCode.update({
-      where: { id: accessCode.id },
-      data: {
+    const { error: updateError } = await supabaseAdmin
+      .from("access_codes")
+      .update({
         used: true,
-        usedAt: new Date(),
-      },
-    });
+        used_at: new Date().toISOString(),
+      })
+      .eq("id", accessCode.id);
+
+    if (updateError) {
+      console.error("Error updating access code:", updateError);
+      return NextResponse.json(
+        { success: false, message: "Failed to update code" },
+        { status: 500 }
+      );
+    }
 
     // Calculate remaining time until expiry
     const expiresIn = Math.floor(
-      (accessCode.expiresAt.getTime() - now.getTime()) / 1000
+      (expiresAt.getTime() - now.getTime()) / 1000
     );
 
     return NextResponse.json({
