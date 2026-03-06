@@ -12,10 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LogOut, CheckCircle2 } from "lucide-react";
+import { LogOut, CheckCircle2, Calendar, List } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function StudentBookingPage() {
   const router = useRouter();
@@ -91,9 +92,8 @@ export default function StudentBookingPage() {
           filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          console.log("Profile updated:", payload);
           refreshProfile();
-        }
+        },
       )
       .subscribe();
 
@@ -113,29 +113,23 @@ export default function StudentBookingPage() {
     if (!user?.id) return;
 
     try {
-      console.log("🔄 Refreshing profile for user:", user.id);
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
-      console.log("📥 Student Profile fetched from DB:", {
-        name: profile?.full_name,
-        isActive: profile?.is_active,
-        dailyTimeLimit: profile?.daily_time_limit_hours,
-      });
-
       // Check if student account is active
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut();
-        alert("Your account has been disabled. Please contact the administrator.");
+        alert(
+          "Your account has been disabled. Please contact the administrator.",
+        );
         router.push("/student/login");
         return;
       }
 
       setStudentProfile(profile);
-      console.log("✅ Profile updated in state");
     } catch (error) {
       console.error("❌ Profile refresh error:", error);
     }
@@ -164,7 +158,9 @@ export default function StudentBookingPage() {
       // Check if student account is active
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut();
-        alert("Your account has been disabled. Please contact the administrator.");
+        alert(
+          "Your account has been disabled. Please contact the administrator.",
+        );
         router.push("/student/login");
         return;
       }
@@ -199,7 +195,8 @@ export default function StudentBookingPage() {
       date: selectedDate || new Date().toISOString().split("T")[0],
     },
     {
-      enabled: !!studentProfile?.id && !!selectedDate,
+      enabled: !!studentProfile?.id,
+      refetchInterval: 5000, // Refresh every 5 seconds to keep usage updated
     },
   );
 
@@ -208,15 +205,6 @@ export default function StudentBookingPage() {
   const usedHours = todayUsage?.totalHours || 0;
   const remainingHours = Math.max(0, maxHoursPerDay - usedHours);
   const remainingMinutes = Math.round(remainingHours * 60);
-
-  // Debug: Log the calculated values
-  console.log("⏰ Time Limit Calculation:", {
-    profileTimeLimit: studentProfile?.daily_time_limit_hours,
-    maxHoursPerDay,
-    usedHours,
-    remainingHours,
-    remainingMinutes,
-  });
 
   // Filter to only show basic 2D and 3D types (exclude Pro and Ultra)
   const filteredTypes = types?.filter((type: any) => {
@@ -295,15 +283,60 @@ export default function StudentBookingPage() {
     },
   );
 
+  // Fetch student's bookings using Supabase directly
+  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState<any>(null);
+
+  const fetchBookings = async () => {
+    if (!studentProfile?.id) return;
+
+    setBookingsLoading(true);
+    setBookingsError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from("desktop_allocations")
+        .select(
+          `
+          *,
+          desktop:desktops(*)
+        `,
+        )
+        .eq("student_id", studentProfile.id)
+        .order("start_time", { ascending: false });
+
+      if (error) throw error;
+
+      setMyBookings(data || []);
+    } catch (err: any) {
+      console.error("❌ Error fetching bookings:", err);
+      setBookingsError(err);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
   const createBooking = api.allocation.create.useMutation({
     onSuccess: (data) => {
       setBookingData(data);
       setBookingSuccess(true);
+      // Immediately refresh bookings list
+      fetchBookings();
     },
     onError: (error) => {
       alert(error.message);
     },
   });
+
+  // Fetch bookings on mount and when studentProfile changes
+  useEffect(() => {
+    fetchBookings();
+
+    // Refresh every 5 seconds
+    const interval = setInterval(fetchBookings, 5000);
+    return () => clearInterval(interval);
+  }, [studentProfile?.id]);
 
   // Generate available dates (only Today and Tomorrow)
   const getAvailableDates = () => {
@@ -512,11 +545,11 @@ export default function StudentBookingPage() {
         <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
           <div className="flex items-center gap-3">
             <Image
-              src="/logorm.png"
+              src="/logo-01.png"
               alt="Logo"
               width={1000}
               height={1000}
-              className="rounded-lg h-12 w-32 object-contain"
+              className="rounded-lg h-16 w-40 object-contain"
             />
             <div>
               <h1 className="text-xl font-bold text-gray-900">
@@ -527,20 +560,60 @@ export default function StudentBookingPage() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-xs text-gray-500 mb-1">Daily Time Limit</p>
+              <p
+                className={`text-sm font-semibold ${
+                  remainingHours < 0.5
+                    ? "text-red-600"
+                    : remainingHours <= 1
+                      ? "text-orange-600"
+                      : "text-green-600"
+                }`}
+              >
+                {usedHours.toFixed(1)}h / {maxHoursPerDay}h used
+              </p>
+              <p className="text-xs text-gray-600">
+                {remainingHours.toFixed(1)}h remaining
+              </p>
+            </div>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Daily Limit Info */}
-      {/* {selectedDate && todayUsage && (
+      {/* Tabs for Book Desktop and My Bookings */}
+      <div className="max-w-5xl mx-auto">
+        <Tabs defaultValue="book" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-100 p-1 rounded-lg h-14">
+            <TabsTrigger
+              value="book"
+              className="flex items-center justify-center gap-2 text-gray-700 data-[state=active]:bg-[#ee4a62] data-[state=active]:text-white h-12 rounded-md font-medium transition-all"
+            >
+              <Calendar className="w-5 h-5" />
+              Book Desktop
+            </TabsTrigger>
+            <TabsTrigger
+              value="bookings"
+              className="flex items-center justify-center gap-2 text-gray-700 data-[state=active]:bg-[#ee4a62] data-[state=active]:text-white h-12 rounded-md font-medium transition-all"
+            >
+              <List className="w-5 h-5" />
+              My Bookings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="book">
+            {/* Daily Limit Info */}
+            {/* {selectedDate && todayUsage && (
         <div className="max-w-5xl mx-auto mb-6">
           <Card className="p-6 border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
@@ -586,262 +659,366 @@ export default function StudentBookingPage() {
         </div>
       )} */}
 
-      {/* Main Booking Interface */}
-      <div className="max-w-5xl mx-auto">
-        {/* Show error if no time remaining */}
-        {selectedDate && remainingMinutes < 15 && (
-          <Card className="p-6 mb-6 bg-red-50 border-red-200">
-            <h2 className="text-xl font-bold text-red-800 mb-2">
-              ❌ Daily Limit Reached
-            </h2>
-            <p className="text-red-700">
-              You have used your maximum {maxHoursPerDay} hours for today.
-              Please try again tomorrow!
-            </p>
-          </Card>
-        )}
+            {/* Main Booking Interface */}
+            {/* Show error if no time remaining */}
+            {selectedDate && remainingMinutes < 15 && (
+              <Card className="p-6 mb-6 bg-red-50 border-red-200">
+                <h2 className="text-xl font-bold text-red-800 mb-2">
+                  ❌ Daily Limit Reached
+                </h2>
+                <p className="text-red-700">
+                  You have used your maximum {maxHoursPerDay} hours for today.
+                  Please try again tomorrow!
+                </p>
+              </Card>
+            )}
 
-        <div className="space-y-6">
-          {/* Select Date, Time & Duration */}
-          <Card className="p-6 border-gray-200 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Select Date, Time & Duration
-            </h2>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Date
-                </Label>
-                <Select value={selectedDate} onValueChange={setSelectedDate}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Choose a date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableDates().map((date) => (
-                      <SelectItem key={date.value} value={date.value}>
-                        {date.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Time
-                </Label>
-                <Select
-                  value={selectedTime}
-                  onValueChange={setSelectedTime}
-                  disabled={selectedDate !== "" && remainingMinutes < 15}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Choose a time" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {getTimeOptions().map((time) => (
-                      <SelectItem
-                        key={time.value}
-                        value={time.value}
-                        disabled={time.disabled}
-                      >
-                        {time.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Duration
-                </Label>
-                <Select
-                  value={duration.toString()}
-                  onValueChange={(value) => setDuration(parseInt(value))}
-                  disabled={selectedDate !== "" && remainingMinutes < 15}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {remainingMinutes >= 15 && (
-                      <SelectItem value="15">15 minutes</SelectItem>
-                    )}
-                    {remainingMinutes >= 30 && (
-                      <SelectItem value="30">30 minutes</SelectItem>
-                    )}
-                    {remainingMinutes >= 45 && (
-                      <SelectItem value="45">45 minutes</SelectItem>
-                    )}
-                    {remainingMinutes >= 60 && (
-                      <SelectItem value="60">1 hour</SelectItem>
-                    )}
-                    {remainingMinutes >= 90 && (
-                      <SelectItem value="90">1.5 hours</SelectItem>
-                    )}
-                    {remainingMinutes >= 120 && (
-                      <SelectItem value="120">2 hours</SelectItem>
-                    )}
-                    {remainingMinutes >= 180 && (
-                      <SelectItem value="180">3 hours</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Card>
-
-          {/* Select Computer Type (2D or 3D only) */}
-          {selectedDate && selectedTime && (
-            <Card className="p-6 border-gray-200 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Choose Computer Type
-              </h2>
-              <div className="grid md:grid-cols-2 gap-4">
-                {filteredTypes?.map((type: any) => (
-                  <button
-                    key={type.id}
-                    onClick={() => setSelectedTypeId(type.id)}
-                    className={`p-6 rounded-xl border-2 text-left transition-all ${
-                      selectedTypeId === type.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
-                    }`}
-                  >
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {type.display_name}
-                    </h3>
-                  </button>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Show all desktops with booking status */}
-          {selectedTypeId &&
-            availableDesktops &&
-            availableDesktops.length > 0 && (
+            <div className="space-y-6">
+              {/* Select Date, Time & Duration */}
               <Card className="p-6 border-gray-200 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Select Desktop
+                  Select Date, Time & Duration
                 </h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {availableDesktops.map((desktop: any) => (
-                    <button
-                      key={desktop.id}
-                      onClick={() => {
-                        if (!desktop.isBooked) {
-                          setSelectedDesktopId(desktop.id);
-                        }
-                      }}
-                      disabled={desktop.isBooked}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        selectedDesktopId === desktop.id
-                          ? "border-blue-500 bg-blue-50"
-                          : desktop.isBooked
-                            ? "border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed"
-                            : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
-                      }`}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Date
+                    </Label>
+                    <Select
+                      value={selectedDate}
+                      onValueChange={setSelectedDate}
                     >
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-semibold text-gray-900">
-                          {desktop.desktop_name}
-                        </p>
-                        {desktop.isBooked && (
-                          <span className="bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                            BOOKED
-                          </span>
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Choose a date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailableDates().map((date) => (
+                          <SelectItem key={date.value} value={date.value}>
+                            {date.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Time
+                    </Label>
+                    <Select
+                      value={selectedTime}
+                      onValueChange={setSelectedTime}
+                      disabled={selectedDate !== "" && remainingMinutes < 15}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Choose a time" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {getTimeOptions().map((time) => (
+                          <SelectItem
+                            key={time.value}
+                            value={time.value}
+                            disabled={time.disabled}
+                          >
+                            {time.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Duration
+                    </Label>
+                    <Select
+                      value={duration.toString()}
+                      onValueChange={(value) => setDuration(parseInt(value))}
+                      disabled={selectedDate !== "" && remainingMinutes < 15}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select duration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {remainingMinutes >= 15 && (
+                          <SelectItem value="15">15 minutes</SelectItem>
                         )}
-                        {!desktop.isBooked &&
-                          selectedDesktopId === desktop.id && (
-                            <span className="bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                              SELECTED
-                            </span>
-                          )}
-                      </div>
-                      {desktop.location && (
-                        <p className="text-sm text-gray-600">
-                          📍 {desktop.location}
-                        </p>
-                      )}
-                    </button>
-                  ))}
+                        {remainingMinutes >= 30 && (
+                          <SelectItem value="30">30 minutes</SelectItem>
+                        )}
+                        {remainingMinutes >= 45 && (
+                          <SelectItem value="45">45 minutes</SelectItem>
+                        )}
+                        {remainingMinutes >= 60 && (
+                          <SelectItem value="60">1 hour</SelectItem>
+                        )}
+                        {remainingMinutes >= 90 && (
+                          <SelectItem value="90">1.5 hours</SelectItem>
+                        )}
+                        {remainingMinutes >= 120 && (
+                          <SelectItem value="120">2 hours</SelectItem>
+                        )}
+                        {remainingMinutes >= 180 && (
+                          <SelectItem value="180">3 hours</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </Card>
-            )}
 
-          {/* No computers available message */}
-          {selectedTypeId &&
-            availableDesktops &&
-            availableDesktops.length === 0 && (
-              <Card className="p-4 bg-yellow-50 border-yellow-300">
-                <p className="text-yellow-800 font-medium text-sm">
-                  ⚠️ No computers available for this time and type. Please try a
-                  different time or type.
-                </p>
-              </Card>
-            )}
-
-          {/* All desktops booked message */}
-          {selectedTypeId &&
-            availableDesktops &&
-            availableDesktops.length > 0 &&
-            availableDesktops.every((d: any) => d.isBooked) && (
-              <Card className="p-4 bg-orange-50 border-orange-300">
-                <p className="text-orange-800 font-medium text-sm">
-                  ⚠️ All desktops are booked for this time. Please select a
-                  different time.
-                </p>
-              </Card>
-            )}
-
-          {/* Availability Check & Book Button */}
-          {selectedDesktopId && (
-            <div className="space-y-4">
-              {/* Check if selected desktop is booked */}
-              {availableDesktops?.find((d: any) => d.id === selectedDesktopId)
-                ?.isBooked ? (
-                <Card className="p-4 bg-red-50 border-red-300">
-                  <p className="text-red-800 font-medium">
-                    ❌ This desktop is already booked for this time slot
-                  </p>
+              {/* Select Computer Type (2D or 3D only) */}
+              {selectedDate && selectedTime && (
+                <Card className="p-6 border-gray-200 shadow-sm">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    Choose Computer Type
+                  </h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {filteredTypes?.map((type: any) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedTypeId(type.id)}
+                        className={`p-6 rounded-xl border-2 text-left transition-all ${
+                          selectedTypeId === type.id
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
+                        }`}
+                      >
+                        <h3 className="text-xl font-bold text-gray-900">
+                          {type.display_name}
+                        </h3>
+                      </button>
+                    ))}
+                  </div>
                 </Card>
-              ) : checkAvailabilityQuery.data ? (
-                <>
-                  {checkAvailabilityQuery.data.isAvailable ? (
-                    <Card className="p-4 bg-green-50 border-green-300">
-                      <p className="text-green-800 font-medium">
-                        ✅ Computer is available!
-                      </p>
-                    </Card>
-                  ) : (
+              )}
+
+              {/* Show all desktops with booking status */}
+              {selectedTypeId &&
+                availableDesktops &&
+                availableDesktops.length > 0 && (
+                  <Card className="p-6 border-gray-200 shadow-sm">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                      Select Desktop
+                    </h2>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {availableDesktops.map((desktop: any) => (
+                        <button
+                          key={desktop.id}
+                          onClick={() => {
+                            if (!desktop.isBooked) {
+                              setSelectedDesktopId(desktop.id);
+                            }
+                          }}
+                          disabled={desktop.isBooked}
+                          className={`p-4 rounded-lg border-2 text-left transition-all ${
+                            selectedDesktopId === desktop.id
+                              ? "border-blue-500 bg-blue-50"
+                              : desktop.isBooked
+                                ? "border-gray-300 bg-gray-100 opacity-50 cursor-not-allowed"
+                                : "border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="font-semibold text-gray-900">
+                              {desktop.desktop_name}
+                            </p>
+                            {desktop.isBooked && (
+                              <span className="bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                                BOOKED
+                              </span>
+                            )}
+                            {!desktop.isBooked &&
+                              selectedDesktopId === desktop.id && (
+                                <span className="bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                                  SELECTED
+                                </span>
+                              )}
+                          </div>
+                          {desktop.location && (
+                            <p className="text-sm text-gray-600">
+                              📍 {desktop.location}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+              {/* No computers available message */}
+              {selectedTypeId &&
+                availableDesktops &&
+                availableDesktops.length === 0 && (
+                  <Card className="p-4 bg-yellow-50 border-yellow-300">
+                    <p className="text-yellow-800 font-medium text-sm">
+                      ⚠️ No computers available for this time and type. Please
+                      try a different time or type.
+                    </p>
+                  </Card>
+                )}
+
+              {/* All desktops booked message */}
+              {selectedTypeId &&
+                availableDesktops &&
+                availableDesktops.length > 0 &&
+                availableDesktops.every((d: any) => d.isBooked) && (
+                  <Card className="p-4 bg-orange-50 border-orange-300">
+                    <p className="text-orange-800 font-medium text-sm">
+                      ⚠️ All desktops are booked for this time. Please select a
+                      different time.
+                    </p>
+                  </Card>
+                )}
+
+              {/* Availability Check & Book Button */}
+              {selectedDesktopId && (
+                <div className="space-y-4">
+                  {/* Check if selected desktop is booked */}
+                  {availableDesktops?.find(
+                    (d: any) => d.id === selectedDesktopId,
+                  )?.isBooked ? (
                     <Card className="p-4 bg-red-50 border-red-300">
                       <p className="text-red-800 font-medium">
-                        ❌ {checkAvailabilityQuery.data.reason}
+                        ❌ This desktop is already booked for this time slot
                       </p>
                     </Card>
-                  )}
-                </>
-              ) : null}
+                  ) : checkAvailabilityQuery.data ? (
+                    <>
+                      {checkAvailabilityQuery.data.isAvailable ? (
+                        <Card className="p-4 bg-green-50 border-green-300">
+                          <p className="text-green-800 font-medium">
+                            ✅ Computer is available!
+                          </p>
+                        </Card>
+                      ) : (
+                        <Card className="p-4 bg-red-50 border-red-300">
+                          <p className="text-red-800 font-medium">
+                            ❌ {checkAvailabilityQuery.data.reason}
+                          </p>
+                        </Card>
+                      )}
+                    </>
+                  ) : null}
 
-              <Button
-                onClick={handleBookNow}
-                disabled={
-                  !checkAvailabilityQuery.data?.isAvailable ||
-                  createBooking.isPending ||
-                  availableDesktops?.find(
-                    (d: any) => d.id === selectedDesktopId,
-                  )?.isBooked
-                }
-                size="lg"
-                className="w-full h-14 text-lg font-semibold bg-[#ee4a62] hover:bg-[#d43f55] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {createBooking.isPending ? "Booking..." : "Book Now!"}
-              </Button>
+                  <Button
+                    onClick={handleBookNow}
+                    disabled={
+                      !checkAvailabilityQuery.data?.isAvailable ||
+                      createBooking.isPending ||
+                      availableDesktops?.find(
+                        (d: any) => d.id === selectedDesktopId,
+                      )?.isBooked
+                    }
+                    size="lg"
+                    className="w-full h-14 text-lg font-semibold bg-[#ee4a62] hover:bg-[#d43f55] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {createBooking.isPending ? "Booking..." : "Book Now!"}
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="bookings">
+            <div className="space-y-4">
+              <Card className="p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  My Bookings
+                </h2>
+
+                {bookingsLoading ? (
+                  <div className="text-center py-12">
+                    <div className="mb-4">
+                      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#ee4a62] mx-auto"></div>
+                    </div>
+                    <p className="text-gray-500">Loading bookings...</p>
+                  </div>
+                ) : bookingsError ? (
+                  <div className="text-center py-12">
+                    <p className="text-red-600 mb-2">Error loading bookings</p>
+                    <p className="text-sm text-gray-400">
+                      {bookingsError.message}
+                    </p>
+                  </div>
+                ) : !myBookings || myBookings.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="mb-4">
+                      <Calendar className="w-16 h-16 mx-auto text-gray-300" />
+                    </div>
+                    <p className="text-gray-500 mb-2">No bookings yet</p>
+                    <p className="text-sm text-gray-400">
+                      Your booking history will appear here after you book a
+                      desktop.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {myBookings.map((booking: any) => (
+                      <Card key={booking.id} className="p-4 border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-bold text-xl text-gray-900">
+                                {booking.desktop?.desktop_name || "Desktop"}
+                              </h3>
+                              <span
+                                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  booking.status === "active"
+                                    ? "bg-green-100 text-green-700"
+                                    : booking.status === "pending"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : booking.status === "completed"
+                                        ? "bg-gray-100 text-gray-700"
+                                        : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {booking.status.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                              <div>
+                                <span className="font-medium">Date:</span>{" "}
+                                {new Date(
+                                  booking.start_time,
+                                ).toLocaleDateString()}
+                              </div>
+                              <div>
+                                <span className="font-medium">Time:</span>{" "}
+                                {new Date(
+                                  booking.start_time,
+                                ).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}{" "}
+                                -{" "}
+                                {new Date(booking.end_time).toLocaleTimeString(
+                                  [],
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
+                              </div>
+                              <div>
+                                <span className="font-medium">Duration:</span>{" "}
+                                {booking.duration_minutes} minutes
+                              </div>
+                              <div>
+                                <span className="font-medium">Type:</span>{" "}
+                                {booking.desktop?.desktop_type_id || "N/A"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

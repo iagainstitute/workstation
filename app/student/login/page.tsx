@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Monitor, Lock, Mail } from "lucide-react";
+import Image from "next/image";
 
 export default function StudentLoginPage() {
   const router = useRouter();
@@ -72,76 +73,80 @@ export default function StudentLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 shadow-2xl bg-white/80 backdrop-blur-sm border-purple-100">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Student Portal
-          </h1>
-          <p className="text-gray-600">Login to book your workstation</p>
-        </div>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Logo Header */}
+      <div className="w-full px-6 py-4">
+        <Image
+          src="/logo-01.png"
+          alt="IAGA Logo"
+          width={180}
+          height={60}
+          className="object-contain"
+        />
+      </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-800 text-center font-semibold">{error}</p>
-            </div>
-          )}
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Welcome Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-[#C17817] mb-2">
+              Welcome back! 👨‍🎓
+            </h1>
+          </div>
 
-          <div>
-            <Label
-              htmlFor="email"
-              className="text-base font-semibold text-gray-700 mb-2"
-            >
-              Email Address
-            </Label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#ee4a62] w-5 h-5" />
+        {/* Login Form Card */}
+        <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+          <form onSubmit={handleLogin} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-normal text-gray-700">
+                Your Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="piyush@123"
+                placeholder=""
                 required
-                className="pl-12 text-base h-14  bg-white/50"
+                className="h-12 border-pink-300 focus:border-pink-500 focus:ring-pink-500"
                 disabled={loading}
               />
             </div>
-          </div>
 
-          <div>
-            <Label
-              htmlFor="password"
-              className="text-base font-semibold text-gray-700 mb-2"
-            >
-              Password
-            </Label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#ee4a62] w-5 h-5" />
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-normal text-gray-700">
+                Your Password
+              </Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••"
+                placeholder=""
                 required
-                className="pl-12 text-base h-14  bg-white/50"
+                className="h-12 border-pink-300 focus:border-pink-500 focus:ring-pink-500"
                 disabled={loading}
               />
             </div>
-          </div>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            size="lg"
-            className="w-full text-lg py-6 bg-[#ee4a62] hover:bg-[#d43f56] text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </Button>
-        </form>
-      </Card>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-medium rounded-md transition-colors duration-200"
+            >
+              {loading ? "Logging in..." : "Login"}
+            </Button>
+          </form>
+        </div>
+      </div>
+      </div>
     </div>
   );
 }

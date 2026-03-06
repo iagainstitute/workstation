@@ -32,7 +32,7 @@ async function main() {
     data: [
       {
         userId: adminUser.id,
-        days: "1,2,3,4,5", // Monday to Friday (comma-separated)
+        days: [1, 2, 3, 4, 5], // Monday to Friday
         startTime: "09:00",
         endTime: "17:00",
       },
