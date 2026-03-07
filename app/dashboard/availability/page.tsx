@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock, Save, Plus, Trash2 } from "lucide-react";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 interface TimeSlot {
   day: string;
@@ -22,13 +30,17 @@ export default function AvailabilityPage() {
     { day: "Wednesday", startTime: "09:00", endTime: "17:00", enabled: true },
     { day: "Thursday", startTime: "09:00", endTime: "17:00", enabled: true },
     { day: "Friday", startTime: "09:00", endTime: "17:00", enabled: true },
-    { day: "Saturday", startTime: "09:00", endTime: "17:00", enabled: false },
+    { day: "Saturday", startTime: "09:00", endTime: "17:00", enabled: true },
     { day: "Sunday", startTime: "09:00", endTime: "17:00", enabled: false },
   ]);
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const updateSlot = (index: number, field: keyof TimeSlot, value: string | boolean) => {
+  const updateSlot = (
+    index: number,
+    field: keyof TimeSlot,
+    value: string | boolean,
+  ) => {
     const newSchedule = [...schedule];
     newSchedule[index] = { ...newSchedule[index], [field]: value };
     setSchedule(newSchedule);
@@ -49,14 +61,18 @@ export default function AvailabilityPage() {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           Availability
         </h1>
-        <p className="text-gray-600 mt-2">Set your weekly availability for meetings</p>
+        <p className="text-gray-600 mt-2">
+          Set your weekly availability for meetings
+        </p>
       </div>
 
       {/* Schedule */}
       <div className="bg-white rounded-2xl border-2 border-gray-100 p-8 space-y-4">
         <div className="flex items-center gap-2 mb-6">
           <Clock className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Weekly Schedule</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Weekly Schedule
+          </h2>
         </div>
 
         {schedule.map((slot, index) => (
@@ -74,7 +90,9 @@ export default function AvailabilityPage() {
 
             {/* Day */}
             <div className="w-32">
-              <span className={`font-medium ${slot.enabled ? "text-gray-900" : "text-gray-400"}`}>
+              <span
+                className={`font-medium ${slot.enabled ? "text-gray-900" : "text-gray-400"}`}
+              >
                 {slot.day}
               </span>
             </div>
@@ -85,7 +103,9 @@ export default function AvailabilityPage() {
                 <Input
                   type="time"
                   value={slot.startTime}
-                  onChange={(e) => updateSlot(index, "startTime", e.target.value)}
+                  onChange={(e) =>
+                    updateSlot(index, "startTime", e.target.value)
+                  }
                   className="w-32"
                 />
                 <span className="text-gray-400">to</span>
@@ -127,8 +147,13 @@ export default function AvailabilityPage() {
         <ul className="space-y-2 text-sm text-blue-800">
           <li>• Enable the days you want to accept bookings</li>
           <li>• Set realistic time ranges to avoid back-to-back meetings</li>
-          <li>• Consider adding buffer time between meetings in Event Type settings</li>
-          <li>• You can override specific dates in Date Overrides (coming soon)</li>
+          <li>
+            • Consider adding buffer time between meetings in Event Type
+            settings
+          </li>
+          <li>
+            • You can override specific dates in Date Overrides (coming soon)
+          </li>
         </ul>
       </div>
     </div>

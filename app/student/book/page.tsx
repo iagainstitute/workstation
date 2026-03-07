@@ -338,14 +338,18 @@ export default function StudentBookingPage() {
     return () => clearInterval(interval);
   }, [studentProfile?.id]);
 
-  // Generate available dates (only Today and Tomorrow)
+  // Generate available dates (always show 2 options: Today/Tomorrow)
   const getAvailableDates = () => {
     const dates = [];
     const holidayDates = new Set(holidays?.map((h: any) => h.date) || []);
 
-    for (let i = 0; i <= 1; i++) {
+    // Find next 2 available dates
+    let daysChecked = 0;
+    let foundDates = 0;
+
+    while (foundDates < 2 && daysChecked < 7) {
       const date = new Date();
-      date.setDate(date.getDate() + i);
+      date.setDate(date.getDate() + daysChecked);
       const dateStr = date.toISOString().split("T")[0];
       const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
 
@@ -354,15 +358,23 @@ export default function StudentBookingPage() {
       const isHoliday = holidayDates.has(dateStr);
       const isDisabled = isSunday || isHoliday;
 
-      dates.push({
-        value: dateStr,
-        label: i === 0 ? "Today" : "Tomorrow",
-        disabled: isDisabled,
-        reason: isSunday ? "Sunday" : isHoliday ? "Holiday" : null,
-      });
+      if (!isDisabled) {
+        // Determine label: Always show "Today" and "Tomorrow"
+        const label = foundDates === 0 ? "Today" : "Tomorrow";
+
+        dates.push({
+          value: dateStr,
+          label: label,
+          disabled: false,
+          reason: null,
+        });
+        foundDates++;
+      }
+
+      daysChecked++;
     }
 
-    return dates.filter((d) => !d.disabled); // Only return non-disabled dates
+    return dates;
   };
 
   // Generate time options (every 15 minutes, ending at 6:30 PM)

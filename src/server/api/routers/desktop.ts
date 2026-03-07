@@ -7,12 +7,14 @@ export const desktopRouter = createTRPCRouter({
   // Get all desktops (admin)
   list: protectedProcedure.query(async () => {
     const { data, error } = await supabaseAdmin
-      .from('desktops')
-      .select(`
+      .from("desktops")
+      .select(
+        `
         *,
         desktop_type:desktop_types(*)
-      `)
-      .order('created_at', { ascending: false });
+      `,
+      )
+      .order("created_at", { ascending: false });
 
     if (error) {
       throw new TRPCError({
@@ -27,29 +29,33 @@ export const desktopRouter = createTRPCRouter({
   // Get available desktops (public) - filtered by type
   listAvailable: publicProcedure
     .input(
-      z.object({
-        typeId: z.string().optional(),
-        date: z.string().optional(), // ISO date string for checking availability
-        time: z.string().optional(), // Time in HH:MM format
-        durationMinutes: z.number().optional().default(60),
-        showAll: z.boolean().optional().default(true), // Show all desktops including booked ones
-      }).optional()
+      z
+        .object({
+          typeId: z.string().optional(),
+          date: z.string().optional(), // ISO date string for checking availability
+          time: z.string().optional(), // Time in HH:MM format
+          durationMinutes: z.number().optional().default(60),
+          showAll: z.boolean().optional().default(true), // Show all desktops including booked ones
+        })
+        .optional(),
     )
     .query(async ({ input }) => {
       let query = supabaseAdmin
-        .from('desktops')
-        .select(`
+        .from("desktops")
+        .select(
+          `
           *,
           desktop_type:desktop_types(*)
-        `)
-        .eq('status', 'available')
-        .eq('is_active', true);
+        `,
+        )
+        .eq("status", "available")
+        .eq("is_active", true);
 
       if (input?.typeId) {
-        query = query.eq('desktop_type_id', input.typeId);
+        query = query.eq("desktop_type_id", input.typeId);
       }
 
-      const { data, error } = await query.order('desktop_name');
+      const { data, error } = await query.order("desktop_name");
 
       if (error) {
         throw new TRPCError({
@@ -61,7 +67,9 @@ export const desktopRouter = createTRPCRouter({
       // Filter by weekly_hours if date is provided
       let filteredBySchedule = data;
       if (input?.date) {
-        const dayOfWeek = new Date(input.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        const dayOfWeek = new Date(input.date)
+          .toLocaleDateString("en-US", { weekday: "long" })
+          .toLowerCase();
 
         filteredBySchedule = data.filter((desktop) => {
           if (!desktop.weekly_hours) return true; // If no schedule, assume available
@@ -73,15 +81,17 @@ export const desktopRouter = createTRPCRouter({
       // Check booking status for each desktop if date and time are provided
       if (input?.date && input?.time) {
         const startDateTime = new Date(`${input.date}T${input.time}:00`);
-        const endDateTime = new Date(startDateTime.getTime() + (input.durationMinutes || 60) * 60000);
+        const endDateTime = new Date(
+          startDateTime.getTime() + (input.durationMinutes || 60) * 60000,
+        );
 
         // Get all active bookings that could conflict
         const { data: allBookings } = await supabaseAdmin
-          .from('desktop_allocations')
-          .select('desktop_id, start_time, end_time')
-          .eq('status', 'active')
-          .gte('end_time', startDateTime.toISOString())
-          .lte('start_time', endDateTime.toISOString());
+          .from("desktop_allocations")
+          .select("desktop_id, start_time, end_time")
+          .eq("status", "active")
+          .gte("end_time", startDateTime.toISOString())
+          .lte("start_time", endDateTime.toISOString());
 
         // Add booking status to each desktop
         const desktopsWithStatus = filteredBySchedule.map((desktop) => {
@@ -102,7 +112,7 @@ export const desktopRouter = createTRPCRouter({
           return {
             ...desktop,
             isBooked: hasConflict,
-            bookingStatus: hasConflict ? 'booked' : 'available',
+            bookingStatus: hasConflict ? "booked" : "available",
           };
         });
 
@@ -111,7 +121,7 @@ export const desktopRouter = createTRPCRouter({
         if (input.showAll) {
           return desktopsWithStatus;
         } else {
-          return desktopsWithStatus.filter(d => !d.isBooked);
+          return desktopsWithStatus.filter((d) => !d.isBooked);
         }
       }
 
@@ -123,12 +133,14 @@ export const desktopRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const { data, error } = await supabaseAdmin
-        .from('desktops')
-        .select(`
+        .from("desktops")
+        .select(
+          `
           *,
           desktop_type:desktop_types(*)
-        `)
-        .eq('id', input.id)
+        `,
+        )
+        .eq("id", input.id)
         .single();
 
       if (error || !data) {
@@ -144,10 +156,10 @@ export const desktopRouter = createTRPCRouter({
   // Get desktop types (public)
   getTypes: publicProcedure.query(async () => {
     const { data, error } = await supabaseAdmin
-      .from('desktop_types')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_name');
+      .from("desktop_types")
+      .select("*")
+      .eq("is_active", true)
+      .order("display_name");
 
     if (error) {
       throw new TRPCError({
@@ -162,9 +174,9 @@ export const desktopRouter = createTRPCRouter({
   // Get booking settings (public)
   getSettings: publicProcedure.query(async () => {
     const { data, error } = await supabaseAdmin
-      .from('booking_settings')
-      .select('*')
-      .eq('is_active', true)
+      .from("booking_settings")
+      .select("*")
+      .eq("is_active", true)
       .limit(1)
       .single();
 
@@ -175,8 +187,8 @@ export const desktopRouter = createTRPCRouter({
         max_hours_per_day: 4,
         max_sessions_per_day: 2,
         days_ahead_booking: 1,
-        business_hours_start: '09:00',
-        business_hours_end: '19:00',
+        business_hours_start: "09:00",
+        business_hours_end: "19:00",
       };
     }
 
@@ -190,14 +202,16 @@ export const desktopRouter = createTRPCRouter({
         desktopName: z.string().min(1),
         desktopTypeId: z.string(),
         branchId: z.string().optional(),
-        status: z.enum(["available", "occupied", "maintenance", "reserved"]).default("available"),
+        status: z
+          .enum(["available", "occupied", "maintenance", "reserved"])
+          .default("available"),
         specifications: z.any().optional(),
         weeklyHours: z.any().optional(),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
       const { data, error } = await supabaseAdmin
-        .from('desktops')
+        .from("desktops")
         .insert({
           desktop_name: input.desktopName,
           desktop_type_id: input.desktopTypeId,
@@ -211,7 +225,7 @@ export const desktopRouter = createTRPCRouter({
             wednesday: { available: true, start: "09:00", end: "19:00" },
             thursday: { available: true, start: "09:00", end: "19:00" },
             friday: { available: true, start: "09:00", end: "19:00" },
-            saturday: { available: false },
+            saturday: { available: true, start: "09:00", end: "19:00" },
             sunday: { available: false },
           },
         })
@@ -235,25 +249,31 @@ export const desktopRouter = createTRPCRouter({
         id: z.string(),
         desktopName: z.string().min(1).optional(),
         desktopTypeId: z.string().optional(),
-        status: z.enum(["available", "occupied", "maintenance", "reserved"]).optional(),
+        status: z
+          .enum(["available", "occupied", "maintenance", "reserved"])
+          .optional(),
         specifications: z.any().optional(),
         weeklyHours: z.any().optional(),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
       const { id, ...updateData } = input;
 
       const dbUpdate: any = {};
-      if (updateData.desktopName) dbUpdate.desktop_name = updateData.desktopName;
-      if (updateData.desktopTypeId) dbUpdate.desktop_type_id = updateData.desktopTypeId;
+      if (updateData.desktopName)
+        dbUpdate.desktop_name = updateData.desktopName;
+      if (updateData.desktopTypeId)
+        dbUpdate.desktop_type_id = updateData.desktopTypeId;
       if (updateData.status) dbUpdate.status = updateData.status;
-      if (updateData.specifications !== undefined) dbUpdate.specifications = updateData.specifications;
-      if (updateData.weeklyHours !== undefined) dbUpdate.weekly_hours = updateData.weeklyHours;
+      if (updateData.specifications !== undefined)
+        dbUpdate.specifications = updateData.specifications;
+      if (updateData.weeklyHours !== undefined)
+        dbUpdate.weekly_hours = updateData.weeklyHours;
 
       const { data, error } = await supabaseAdmin
-        .from('desktops')
+        .from("desktops")
         .update(dbUpdate)
-        .eq('id', id)
+        .eq("id", id)
         .select()
         .single();
 
@@ -272,9 +292,9 @@ export const desktopRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       const { error } = await supabaseAdmin
-        .from('desktops')
+        .from("desktops")
         .delete()
-        .eq('id', input.id);
+        .eq("id", input.id);
 
       if (error) {
         throw new TRPCError({

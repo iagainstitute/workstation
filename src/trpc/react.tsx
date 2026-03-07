@@ -24,7 +24,7 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
             staleTime: 60 * 1000,
           },
         },
-      })
+      }),
   );
 
   const [trpcClient] = useState(() =>
@@ -45,7 +45,7 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
           },
         }),
       ],
-    })
+    }),
   );
 
   return (
