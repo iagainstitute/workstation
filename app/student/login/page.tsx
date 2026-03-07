@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Monitor, Lock, Mail } from "lucide-react";
+import Squares from "../../../components/Sqaure";
+// import { Button } from "@/components/ui/button";
+// import { Input } from "@/components/ui/input";
+// import { Label } from "@/components/ui/label";
+// import { Card } from "@/components/ui/card";
+// import { Monitor, Lock, Mail } from "lucide-react";
 import Image from "next/image";
+// import Squares from "./Square";
+// import { ShinyButton } from "../../../../src/components/ui/shiny-button";
+// import Lanyard from "./Lanyard";
 
 export default function StudentLoginPage() {
   const router = useRouter();
@@ -73,79 +77,103 @@ export default function StudentLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Logo Header */}
-      <div className="w-full px-6 py-4">
-        <Image
-          src="/logo-01.png"
-          alt="IAGA Logo"
-          width={180}
-          height={60}
-          className="object-contain"
-        />
-      </div>
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="min-h-screen w-full bg-white relative text-gray-800">
+        {/* Left Masked Circuit Board - Light Pattern */}
+        <div className="min-h-screen w-full bg-white relative overflow-hidden">
+          {/* Purple Corner Grid Background */}
+          <div
+            className="absolute inset-0 z-0"
+            style={{
+              backgroundImage: `
+       linear-gradient(to right, #f0f0f0 1px, transparent 1px),
+       linear-gradient(to bottom, #f0f0f0 1px, transparent 1px),
+       radial-gradient(circle 600px at 0% 200px, #d5c5ff, transparent),
+       radial-gradient(circle 600px at 100% 200px, #d5c5ff, transparent)
+     `,
+              backgroundSize: "20px 20px, 20px 20px, 100% 100%, 100% 100%",
+            }}
+          />
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          {/* Welcome Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-[#C17817] mb-2">
-              Welcome back! 👨‍🎓
-            </h1>
-          </div>
+          <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
+            {/* Login Card */}
+            <div className="w-full max-w-md">
+              <div className="bg-white rounded-lg p-8 shadow-2xl">
+                {/* Logo inside card */}
+                <div className="flex justify-center mb-6">
+                  <Image
+                    src="/logo-01.png"
+                    alt="IAGA Logo"
+                    width={1000}
+                    height={1000}
+                    className="h-24 w-auto object-contain"
+                  />
+                </div>
 
-        {/* Login Form Card */}
-        <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
-          <form onSubmit={handleLogin} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                <p className="text-red-600 text-sm">{error}</p>
+                {/* Welcome text inside card */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl font-bold mb-2">
+                    Workstation Portal
+                  </h1>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-6">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                      <p className="text-red-600 text-sm">{error}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Your Email
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="piyush@123"
+                      required
+                      className="w-full h-12 px-4 border border-pink-200 bg-pink-50 rounded-md focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="password"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Your Password
+                    </label>
+                    <input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className="w-full h-12 px-4 border border-pink-200 bg-pink-50 rounded-md focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Logging in..." : "Login"}
+                  </button>
+                </form>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-normal text-gray-700">
-                Your Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder=""
-                required
-                className="h-12 border-pink-300 focus:border-pink-500 focus:ring-pink-500"
-                disabled={loading}
-              />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-normal text-gray-700">
-                Your Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder=""
-                required
-                className="h-12 border-pink-300 focus:border-pink-500 focus:ring-pink-500"
-                disabled={loading}
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 bg-red-600 hover:bg-red-500 text-white font-medium rounded-md transition-colors duration-200"
-            >
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-        </div>
-      </div>
+          </div>
+        </div>{" "}
       </div>
     </div>
   );
