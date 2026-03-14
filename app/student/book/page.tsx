@@ -209,10 +209,13 @@ export default function StudentBookingPage() {
   // Filter to only show basic 2D and 3D types (exclude Pro and Ultra)
   const filteredTypes = types?.filter((type: any) => {
     const name = type.display_name.toLowerCase();
+
     return (
-      (name.includes("2d") || name.includes("3d")) &&
-      !name.includes("pro") &&
-      !name.includes("ultra")
+      name.includes("graphics") ||
+      name.includes("3d") ||
+      (name.includes("graphics and editing") &&
+        !name.includes("pro") &&
+        !name.includes("ultra"))
     );
   });
 
