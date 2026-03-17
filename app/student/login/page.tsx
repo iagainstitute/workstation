@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Squares from "../../../components/Sqaure";
+import { Eye, EyeOff } from "lucide-react";
 // import { Button } from "@/components/ui/button";
 // import { Input } from "@/components/ui/input";
 // import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ export default function StudentLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     // Check if already logged in
@@ -150,16 +152,30 @@ export default function StudentLoginPage() {
                     >
                       Your Password
                     </label>
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                      className="w-full h-12 px-4 border border-pink-200 bg-pink-50 rounded-md focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all"
-                      disabled={loading}
-                    />
+                    <div className="relative">
+                      <input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="w-full h-12 px-4 pr-12 border border-pink-200 bg-pink-50 rounded-md focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all"
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                        disabled={loading}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <button
@@ -173,7 +189,7 @@ export default function StudentLoginPage() {
               </div>
             </div>
           </div>
-        </div>{" "}
+        </div>
       </div>
     </div>
   );
