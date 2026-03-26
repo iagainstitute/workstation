@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
       .from("access_codes")
       .update({
         used: true,
-        used_at: new Date().toISOString(),
       })
       .eq("id", accessCode.id);
 
