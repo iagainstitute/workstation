@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api } from "@/trpc/react";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Monitor, Clock, User, Mail, Phone, Calendar, CheckCircle2 } from "lucide-react";
@@ -31,16 +30,19 @@ export default function DesktopBookingPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get current user
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-      } else {
-        router.push('/student/login');
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("workstation_student");
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          if (user?.id) {
+            setUserId(user.id);
+            return;
+          }
+        } catch (e) {}
       }
-    };
-    getUser();
+      router.push("/student/login");
+    }
   }, [router]);
 
   const { data: desktopTypes } = api.desktop.getTypes.useQuery();

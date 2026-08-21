@@ -5,9 +5,25 @@ import { ZodError } from "zod";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth";
 import { db } from "../db";
+import { getAuthenticatedUser } from "@/lib/jwt";
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
-  const session = await getServerSession(authOptions);
+  let session = await getServerSession(authOptions);
+
+  if (!session?.user && opts?.req) {
+    const authUser = await getAuthenticatedUser(opts.req);
+    if (authUser) {
+      session = {
+        user: {
+          id: authUser.userId || authUser.id || authUser.sub,
+          name: authUser.name || authUser.fullName,
+          email: authUser.email,
+          role: authUser.role,
+        },
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      } as any;
+    }
+  }
 
   return {
     db,

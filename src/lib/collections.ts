@@ -1,0 +1,15 @@
+export const Collections = {
+  BRANCHES: "branches",
+  PROFILES: "profiles",
+  COURSES: "courses",
+  MODULES: "modules",
+  BATCHES: "batches",
+  CLASSES: "classes",
+  DESKTOPS: "desktops",
+  DESKTOP_TYPES: "desktop_types",
+  DESKTOP_ALLOCATIONS: "desktop_allocations",
+  DESKTOP_ALLOCATION_HISTORY: "desktop_allocation_history",
+  HOLIDAYS: "holidays",
+  ACCESS_CODES: "access_codes",
+  BOOKING_SETTINGS: "booking_settings",
+} as const;

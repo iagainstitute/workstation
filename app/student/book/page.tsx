@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LogOut, CheckCircle2, Calendar, List } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,12 +25,14 @@ export default function StudentBookingPage() {
   const [studentProfile, setStudentProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Booking state
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedTime, setSelectedTime] = useState<string>("");
+  // Booking form state
   const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [selectedTime, setSelectedTime] = useState<string>("09:00");
+  const [duration, setDuration] = useState<number>(60);
   const [selectedDesktopId, setSelectedDesktopId] = useState<string>("");
-  const [duration, setDuration] = useState<number>(60); // Custom duration in minutes
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingData, setBookingData] = useState<any>(null);
 
@@ -76,107 +77,52 @@ export default function StudentBookingPage() {
     checkAuth();
   }, []);
 
-  // Real-time subscription to profile changes
-  useEffect(() => {
-    if (!user?.id) return;
-
-    // Subscribe to profile changes for real-time updates
-    const channel = supabase
-      .channel(`profile-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "profiles",
-          filter: `id=eq.${user.id}`,
-        },
-        (payload) => {
-          refreshProfile();
-        },
-      )
-      .subscribe();
-
-    // Also refresh when window gains focus
-    const handleFocus = () => {
-      refreshProfile();
-    };
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      supabase.removeChannel(channel);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [user?.id]);
-
-  const refreshProfile = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      // Check if student account is active
-      if (profile && profile.is_active === false) {
-        await supabase.auth.signOut();
-        alert(
-          "Your account has been disabled. Please contact the administrator.",
-        );
-        router.push("/student/login");
-        return;
-      }
-
-      setStudentProfile(profile);
-    } catch (error) {
-      console.error("❌ Profile refresh error:", error);
-    }
-  };
-
   const checkAuth = async () => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("workstation_student");
+    if (!stored) {
+      router.push("/student/login");
+      return;
+    }
+
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      const parsed = JSON.parse(stored);
+      if (!parsed?.id) {
         router.push("/student/login");
         return;
       }
-
-      setUser(user);
-
-      // Get student profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      // Check if student account is active
-      if (profile && profile.is_active === false) {
-        await supabase.auth.signOut();
-        alert(
-          "Your account has been disabled. Please contact the administrator.",
-        );
-        router.push("/student/login");
-        return;
-      }
-
-      setStudentProfile(profile);
+      setUser(parsed);
+      setStudentProfile(parsed);
       setLoading(false);
-    } catch (error) {
-      console.error("Auth error:", error);
+    } catch (e) {
       router.push("/student/login");
     }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("workstation_student");
+      localStorage.removeItem("workstation_token");
+      document.cookie = "iaga-auth-token=; path=/; max-age=0";
+    }
     router.push("/student/login");
   };
+
+  // Periodic profile sync
+  const { data: refreshedProfile } = api.auth.getProfile.useQuery(
+    { userId: user?.id || "" },
+    { enabled: !!user?.id, refetchInterval: 60000 }
+  );
+
+  useEffect(() => {
+    if (refreshedProfile) {
+      if ((refreshedProfile as any).is_active === false || (refreshedProfile as any).isActive === false) {
+        handleLogout();
+        alert("Your account has been disabled. Please contact the administrator.");
+      }
+      setStudentProfile(refreshedProfile);
+    }
+  }, [refreshedProfile]);
 
   // Fetch data
   const { data: settings } = api.desktop.getSettings.useQuery();
@@ -201,14 +147,14 @@ export default function StudentBookingPage() {
   );
 
   // Calculate remaining hours using student's custom time limit
-  const maxHoursPerDay = studentProfile?.daily_time_limit_hours || 3;
+  const maxHoursPerDay = (studentProfile as any)?.daily_time_limit_hours ?? (studentProfile as any)?.dailyTimeLimitHours ?? 3;
   const usedHours = todayUsage?.totalHours || 0;
   const remainingHours = Math.max(0, maxHoursPerDay - usedHours);
   const remainingMinutes = Math.round(remainingHours * 60);
 
   // Filter to only show basic 2D and 3D types (exclude Pro and Ultra)
   const filteredTypes = types?.filter((type: any) => {
-    const name = type.display_name.toLowerCase();
+    const name = (type?.display_name || type?.displayName || type?.name || type?.category || "").toLowerCase();
 
     return (
       name.includes("graphics") ||
@@ -286,60 +232,33 @@ export default function StudentBookingPage() {
     },
   );
 
-  // Fetch student's bookings using Supabase directly
-  const [myBookings, setMyBookings] = useState<any[]>([]);
-  const [bookingsLoading, setBookingsLoading] = useState(false);
-  const [bookingsError, setBookingsError] = useState<any>(null);
-
-  const fetchBookings = async () => {
-    if (!studentProfile?.id) return;
-
-    setBookingsLoading(true);
-    setBookingsError(null);
-
-    try {
-      const { data, error } = await supabase
-        .from("desktop_allocations")
-        .select(
-          `
-          *,
-          desktop:desktops(*)
-        `,
-        )
-        .eq("student_id", studentProfile.id)
-        .order("start_time", { ascending: false });
-
-      if (error) throw error;
-
-      setMyBookings(data || []);
-    } catch (err: any) {
-      console.error("❌ Error fetching bookings:", err);
-      setBookingsError(err);
-    } finally {
-      setBookingsLoading(false);
+  // Fetch student's bookings using tRPC
+  const {
+    data: bookingsData,
+    isLoading: bookingsLoading,
+    error: bookingsError,
+    refetch: refetchBookings,
+  } = api.allocation.list.useQuery(
+    { studentId: studentProfile?.id },
+    {
+      enabled: !!studentProfile?.id,
+      refetchInterval: 5000,
     }
-  };
+  );
+
+  const myBookings = bookingsData || [];
 
   const createBooking = api.allocation.create.useMutation({
     onSuccess: (data) => {
       setBookingData(data);
       setBookingSuccess(true);
-      // Immediately refresh bookings list
-      fetchBookings();
+      refetchBookings();
     },
     onError: (error) => {
       alert(error.message);
     },
   });
 
-  // Fetch bookings on mount and when studentProfile changes
-  useEffect(() => {
-    fetchBookings();
-
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchBookings, 5000);
-    return () => clearInterval(interval);
-  }, [studentProfile?.id]);
 
   // Generate available dates (always show 2 options: Today/Tomorrow)
   const getAvailableDates = () => {
@@ -800,7 +719,7 @@ export default function StudentBookingPage() {
                         }`}
                       >
                         <h3 className="text-xl font-bold text-gray-900">
-                          {type.display_name}
+                          {type?.display_name || type?.displayName || type?.name || type?.category}
                         </h3>
                       </button>
                     ))}
@@ -836,7 +755,7 @@ export default function StudentBookingPage() {
                         >
                           <div className="flex justify-between items-start mb-1">
                             <p className="font-semibold text-gray-900">
-                              {desktop.desktop_name}
+                              {desktop.desktop_name || desktop.desktopName || desktop.name || "Desktop"}
                             </p>
                             {desktop.isBooked && (
                               <span className="bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">

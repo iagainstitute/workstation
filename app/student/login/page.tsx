@@ -2,18 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import Squares from "../../../components/Sqaure";
 import { Eye, EyeOff } from "lucide-react";
-// import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label";
-// import { Card } from "@/components/ui/card";
-// import { Monitor, Lock, Mail } from "lucide-react";
 import Image from "next/image";
-// import Squares from "./Square";
-// import { ShinyButton } from "../../../../src/components/ui/shiny-button";
-// import Lanyard from "./Lanyard";
+import { api } from "@/trpc/react";
 
 export default function StudentLoginPage() {
   const router = useRouter();
@@ -23,17 +15,40 @@ export default function StudentLoginPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  const studentLoginMutation = api.auth.studentLogin.useMutation({
+    onSuccess: (data) => {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("workstation_student", JSON.stringify(data.user));
+        localStorage.setItem("workstation_token", data.token);
+        // Also set auth cookie
+        document.cookie = `iaga-auth-token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
+      }
+      router.push("/student/book");
+    },
+    onError: (err) => {
+      console.error("Login error:", err);
+      setError(err.message || "Invalid email or password");
+      setLoading(false);
+    },
+  });
+
   useEffect(() => {
-    // Check if already logged in
     checkUser();
   }, []);
 
   const checkUser = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      router.push("/student/book");
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("workstation_student");
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          if (user?.id) {
+            router.push("/student/book");
+          }
+        } catch (e) {
+          localStorage.removeItem("workstation_student");
+        }
+      }
     }
   };
 
@@ -43,47 +58,19 @@ export default function StudentLoginPage() {
     setError("");
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword(
-        {
-          email,
-          password,
-        },
-      );
-
-      if (authError) {
-        throw authError;
-      }
-
-      if (data.user) {
-        // Check if user is a student
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profile?.role !== "student") {
-          await supabase.auth.signOut();
-          setError("Only students can login here");
-          setLoading(false);
-          return;
-        }
-
-        router.push("/student/book");
-      }
+      await studentLoginMutation.mutateAsync({
+        email,
+        password,
+      });
     } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err.message || "Invalid email or password");
-      setLoading(false);
+      // handled in onError
     }
   };
 
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="min-h-screen w-full bg-white relative text-gray-800">
-        {/* Left Masked Circuit Board - Light Pattern */}
         <div className="min-h-screen w-full bg-white relative overflow-hidden">
-          {/* Purple Corner Grid Background */}
           <div
             className="absolute inset-0 z-0"
             style={{
@@ -98,95 +85,76 @@ export default function StudentLoginPage() {
           />
 
           <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
-            {/* Login Card */}
-            <div className="w-full max-w-md">
-              <div className="bg-white rounded-lg p-8 shadow-2xl">
-                {/* Logo inside card */}
-                <div className="flex justify-center mb-6">
+            <div className="w-full max-w-md bg-white border border-gray-200 shadow-xl rounded-2xl p-8 backdrop-blur-sm">
+              <div className="flex flex-col items-center mb-8">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                   <Image
-                    src="/logo-01.png"
-                    alt="IAGA Logo"
-                    width={1000}
-                    height={1000}
-                    className="h-24 w-auto object-contain"
+                    src="/logo.png"
+                    alt="Logo"
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                    onError={(e) => {
+                      (e.target as any).style.display = "none";
+                    }}
+                  />
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900">Student Portal</h1>
+                <p className="text-sm text-gray-500 mt-1">Book your lab workstation</p>
+              </div>
+
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="student@example.com"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none transition text-gray-900 bg-white"
                   />
                 </div>
 
-                {/* Welcome text inside card */}
-                <div className="text-center mb-8">
-                  <h1 className="text-4xl font-bold mb-2">
-                    Workstation Portal
-                  </h1>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none transition text-gray-900 bg-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-6">
-                  {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                      <p className="text-red-600 text-sm">{error}</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="email"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Your Email
-                    </label>
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="piyush@123"
-                      required
-                      className="w-full h-12 px-4 border border-pink-200 bg-pink-50 rounded-md focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all"
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="password"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Your Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        className="w-full h-12 px-4 pr-12 border border-pink-200 bg-pink-50 rounded-md focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all"
-                        disabled={loading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                        disabled={loading}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? "Logging in..." : "Login"}
-                  </button>
-                </form>
-              </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Signing in..." : "Sign In to Book Lab"}
+                </button>
+              </form>
             </div>
           </div>
         </div>

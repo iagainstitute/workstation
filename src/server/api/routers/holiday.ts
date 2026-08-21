@@ -1,79 +1,100 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getCollection } from "@/lib/mongodb";
+import { Collections } from "@/lib/collections";
+import { ObjectId } from "mongodb";
+import { randomUUID } from "node:crypto";
+
+function formatDoc(doc: any) {
+  if (!doc) return doc;
+  const { _id, ...rest } = doc;
+  return {
+    ...rest,
+    id: rest.id || (_id ? _id.toString() : undefined),
+  };
+}
 
 export const holidayRouter = createTRPCRouter({
   // Get all holidays (public - for checking disabled dates)
   list: publicProcedure
     .input(
-      z.object({
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-      }).optional()
+      z
+        .object({
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+        .optional(),
     )
     .query(async ({ input }) => {
-      let query = supabaseAdmin
-        .from('holidays')
-        .select('*')
-        .eq('is_active', true)
-        .order('date', { ascending: true });
+      try {
+        const holidaysCol = await getCollection(Collections.HOLIDAYS);
+        const filter: any = {
+          is_active: { $ne: false },
+        };
 
-      if (input?.startDate) {
-        query = query.gte('date', input.startDate);
-      }
+        if (input?.startDate) {
+          filter.date = filter.date || {};
+          filter.date.$gte = input.startDate;
+        }
 
-      if (input?.endDate) {
-        query = query.lte('date', input.endDate);
-      }
+        if (input?.endDate) {
+          filter.date = filter.date || {};
+          filter.date.$lte = input.endDate;
+        }
 
-      const { data, error } = await query;
-
-      if (error) {
+        const holidays = await holidaysCol.find(filter).sort({ date: 1 }).toArray();
+        return holidays.map(formatDoc);
+      } catch (error: any) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error.message,
         });
       }
-
-      return data;
     }),
 
   // Get all holidays including inactive (admin)
   listAll: protectedProcedure.query(async () => {
-    const { data, error } = await supabaseAdmin
-      .from('holidays')
-      .select('*')
-      .order('date', { ascending: true });
-
-    if (error) {
+    try {
+      const holidaysCol = await getCollection(Collections.HOLIDAYS);
+      const holidays = await holidaysCol.find({}).sort({ date: 1 }).toArray();
+      return holidays.map(formatDoc);
+    } catch (error: any) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: error.message,
       });
     }
-
-    return data;
   }),
 
   // Get holiday by ID (admin)
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      const { data, error } = await supabaseAdmin
-        .from('holidays')
-        .select('*')
-        .eq('id', input.id)
-        .single();
+      try {
+        const holidaysCol = await getCollection(Collections.HOLIDAYS);
+        const holiday = await holidaysCol.findOne({
+          $or: [
+            { id: input.id },
+            ...(ObjectId.isValid(input.id) ? [{ _id: new ObjectId(input.id) }] : []),
+          ],
+        });
 
-      if (error || !data) {
+        if (!holiday) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Holiday not found",
+          });
+        }
+
+        return formatDoc(holiday);
+      } catch (error: any) {
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Holiday not found",
+          code: "INTERNAL_SERVER_ERROR",
+          message: error.message,
         });
       }
-
-      return data;
     }),
 
   // Create holiday (admin)
@@ -84,29 +105,37 @@ export const holidayRouter = createTRPCRouter({
         date: z.string(), // ISO date string (YYYY-MM-DD)
         isRecurring: z.boolean().default(false),
         description: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
-      const { data, error } = await supabaseAdmin
-        .from('holidays')
-        .insert({
+      try {
+        const holidaysCol = await getCollection(Collections.HOLIDAYS);
+        const now = new Date();
+        const newId = randomUUID();
+
+        const newHoliday = {
+          id: newId,
           title: input.title,
           date: input.date,
           is_recurring: input.isRecurring,
-          description: input.description,
+          isRecurring: input.isRecurring,
+          description: input.description || null,
           is_active: true,
-        })
-        .select()
-        .single();
+          isActive: true,
+          created_at: now,
+          createdAt: now,
+          updated_at: now,
+          updatedAt: now,
+        };
 
-      if (error) {
+        await holidaysCol.insertOne(newHoliday as any);
+        return formatDoc(newHoliday);
+      } catch (error: any) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error.message,
         });
       }
-
-      return data;
     }),
 
   // Update holiday (admin)
@@ -119,75 +148,100 @@ export const holidayRouter = createTRPCRouter({
         isRecurring: z.boolean().optional(),
         description: z.string().optional(),
         isActive: z.boolean().optional(),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
-      const { id, ...updateData } = input;
+      try {
+        const holidaysCol = await getCollection(Collections.HOLIDAYS);
+        const { id, ...updateData } = input;
 
-      const dbUpdate: any = { updated_at: new Date().toISOString() };
-      if (updateData.title !== undefined) dbUpdate.title = updateData.title;
-      if (updateData.date !== undefined) dbUpdate.date = updateData.date;
-      if (updateData.isRecurring !== undefined) dbUpdate.is_recurring = updateData.isRecurring;
-      if (updateData.description !== undefined) dbUpdate.description = updateData.description;
-      if (updateData.isActive !== undefined) dbUpdate.is_active = updateData.isActive;
+        const dbUpdate: any = {
+          updated_at: new Date(),
+          updatedAt: new Date(),
+        };
 
-      const { data, error } = await supabaseAdmin
-        .from('holidays')
-        .update(dbUpdate)
-        .eq('id', id)
-        .select()
-        .single();
+        if (updateData.title !== undefined) dbUpdate.title = updateData.title;
+        if (updateData.date !== undefined) dbUpdate.date = updateData.date;
+        if (updateData.isRecurring !== undefined) {
+          dbUpdate.is_recurring = updateData.isRecurring;
+          dbUpdate.isRecurring = updateData.isRecurring;
+        }
+        if (updateData.description !== undefined) dbUpdate.description = updateData.description;
+        if (updateData.isActive !== undefined) {
+          dbUpdate.is_active = updateData.isActive;
+          dbUpdate.isActive = updateData.isActive;
+        }
 
-      if (error || !data) {
+        const result = await holidaysCol.findOneAndUpdate(
+          {
+            $or: [
+              { id },
+              ...(ObjectId.isValid(id) ? [{ _id: new ObjectId(id) }] : []),
+            ],
+          },
+          { $set: dbUpdate },
+          { returnDocument: "after" }
+        );
+
+        if (!result) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Holiday not found",
+          });
+        }
+
+        return formatDoc(result);
+      } catch (error: any) {
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
-          code: error ? "INTERNAL_SERVER_ERROR" : "NOT_FOUND",
-          message: error?.message || "Holiday not found",
+          code: "INTERNAL_SERVER_ERROR",
+          message: error.message,
         });
       }
-
-      return data;
     }),
 
   // Delete holiday (admin)
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      const { error } = await supabaseAdmin
-        .from('holidays')
-        .delete()
-        .eq('id', input.id);
+      try {
+        const holidaysCol = await getCollection(Collections.HOLIDAYS);
+        await holidaysCol.deleteOne({
+          $or: [
+            { id: input.id },
+            ...(ObjectId.isValid(input.id) ? [{ _id: new ObjectId(input.id) }] : []),
+          ],
+        });
 
-      if (error) {
+        return { success: true };
+      } catch (error: any) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error.message,
         });
       }
-
-      return { success: true };
     }),
 
   // Check if a date is a holiday (public)
   isHoliday: publicProcedure
     .input(z.object({ date: z.string() }))
     .query(async ({ input }) => {
-      const { data, error } = await supabaseAdmin
-        .from('holidays')
-        .select('*')
-        .eq('date', input.date)
-        .eq('is_active', true)
-        .limit(1);
+      try {
+        const holidaysCol = await getCollection(Collections.HOLIDAYS);
+        const holiday = await holidaysCol.findOne({
+          date: input.date,
+          is_active: { $ne: false },
+        });
 
-      if (error) {
+        return {
+          isHoliday: !!holiday,
+          holiday: holiday ? formatDoc(holiday) : null,
+        };
+      } catch (error: any) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error.message,
         });
       }
-
-      return {
-        isHoliday: data && data.length > 0,
-        holiday: data && data.length > 0 ? data[0] : null,
-      };
     }),
 });

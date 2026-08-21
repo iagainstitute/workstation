@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getCollection } from "@/lib/mongodb";
+import { Collections } from "@/lib/collections";
+import { ObjectId } from "mongodb";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,22 +14,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Query the access code from database
-    const { data: accessCode, error: fetchError } = await supabaseAdmin
-      .from("access_codes")
-      .select("*")
-      .eq("code", code.toUpperCase())
-      .single();
+    const accessCodesCol = await getCollection(Collections.ACCESS_CODES);
 
-    // Check if code exists
-    if (fetchError || !accessCode) {
+    const accessCode = await accessCodesCol.findOne({
+      code: code.toUpperCase().trim(),
+    });
+
+    if (!accessCode) {
       return NextResponse.json(
         { success: false, message: "Invalid access code" },
         { status: 400 }
       );
     }
 
-    // Check if code is already used
     if (accessCode.used) {
       return NextResponse.json(
         { success: false, message: "This code has already been used" },
@@ -35,9 +34,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if code has expired
     const now = new Date();
-    const expiresAt = new Date(accessCode.expires_at);
+    const expiresAt = new Date(accessCode.expires_at || accessCode.expiresAt);
     if (now > expiresAt) {
       return NextResponse.json(
         { success: false, message: "This code has expired" },
@@ -45,23 +43,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mark code as used
-    const { error: updateError } = await supabaseAdmin
-      .from("access_codes")
-      .update({
-        used: true,
-      })
-      .eq("id", accessCode.id);
+    await accessCodesCol.updateOne(
+      { _id: accessCode._id },
+      {
+        $set: {
+          used: true,
+          used_at: now.toISOString(),
+          usedAt: now,
+          updated_at: now,
+          updatedAt: now,
+        },
+      }
+    );
 
-    if (updateError) {
-      console.error("Error updating access code:", updateError);
-      return NextResponse.json(
-        { success: false, message: "Failed to update code" },
-        { status: 500 }
-      );
-    }
-
-    // Calculate remaining time until expiry
     const expiresIn = Math.floor(
       (expiresAt.getTime() - now.getTime()) / 1000
     );
@@ -71,10 +65,10 @@ export async function POST(request: NextRequest) {
       message: "Access code verified successfully",
       expiresIn,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error verifying access code:", error);
     return NextResponse.json(
-      { success: false, message: "Internal server error" },
+      { success: false, message: error.message || "Internal server error" },
       { status: 500 }
     );
   }

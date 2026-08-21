@@ -2,99 +2,115 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { getCollection } from "@/lib/mongodb";
+import { Collections } from "@/lib/collections";
+import { signToken } from "@/lib/jwt";
+import { ObjectId } from "mongodb";
+
+function formatDoc(doc: any) {
+  if (!doc) return doc;
+  const { _id, ...rest } = doc;
+  return {
+    ...rest,
+    id: rest.id || (_id ? _id.toString() : undefined),
+  };
+}
 
 export const authRouter = createTRPCRouter({
-  signup: publicProcedure
+  studentLogin: publicProcedure
     .input(
       z.object({
         email: z.string().email(),
-        password: z.string().min(8),
-        name: z.string().min(2),
-        username: z.string().min(3).regex(/^[a-z0-9-]+$/),
-      })
+        password: z.string(),
+      }),
     )
-    .mutation(async ({ ctx, input }) => {
-      // Check if user already exists
-      const existingUser = await ctx.db.user.findFirst({
-        where: {
-          OR: [{ email: input.email }, { username: input.username }],
-        },
+    .mutation(async ({ input }) => {
+      const profilesCol = await getCollection(Collections.PROFILES);
+      const user = await profilesCol.findOne({
+        email: input.email.toLowerCase().trim(),
       });
 
-      if (existingUser) {
-        if (existingUser.email === input.email) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "Email already in use",
-          });
-        }
+      if (!user) {
         throw new TRPCError({
-          code: "CONFLICT",
-          message: "Username already taken",
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password",
         });
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(input.password, 10);
+      let isValid = false;
+      if (user.password) {
+        if (user.password.startsWith("$2a$") || user.password.startsWith("$2b$")) {
+          isValid = await bcrypt.compare(input.password, user.password);
+        } else {
+          isValid = input.password === user.password;
+        }
+      } else if (user.email && input.password.toLowerCase().trim() === user.email.toLowerCase().trim()) {
+        isValid = true;
+      }
 
-      // Create user
-      const user = await ctx.db.user.create({
-        data: {
-          email: input.email,
-          password: hashedPassword,
-          name: input.name,
-          username: input.username,
-        },
+      if (!isValid) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password",
+        });
+      }
+
+      if (user.role !== "student") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only students can login here",
+        });
+      }
+
+      if (user.isActive === false || user.is_active === false) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Your account has been disabled. Please contact the administrator.",
+        });
+      }
+
+      const userId = user.id || user._id.toString();
+
+      const token = await signToken({
+        userId,
+        email: user.email,
+        role: user.role,
+        branchId: user.branchId || user.branch_id || null,
       });
 
+      const { password: _, ...userWithoutPassword } = user as any;
+
       return {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        name: user.name,
+        success: true,
+        user: {
+          ...formatDoc(userWithoutPassword),
+          id: userId,
+        },
+        token,
       };
     }),
 
-  updateProfile: protectedProcedure
-    .input(
-      z.object({
-        name: z.string().min(2).optional(),
-        timezone: z.string().optional(),
-        avatar: z.string().url().optional().nullable(),
-        bio: z.string().optional().nullable(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.update({
-        where: { id: ctx.session.user.id },
-        data: input,
-      });
+  getProfile: publicProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(async ({ input }) => {
+      const profilesCol = await getCollection(Collections.PROFILES);
+      const user = await profilesCol.findOne({
+        $or: [
+          { _id: input.userId as any },
+          { id: input.userId },
+          { Id: input.userId },
+          ...(ObjectId.isValid(input.userId) ? [{ _id: new ObjectId(input.userId) }] : []),
+        ],
+      } as any);
 
-      return user;
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      const { password: _, ...userWithoutPassword } = user as any;
+      return formatDoc(userWithoutPassword);
     }),
-
-  getProfile: protectedProcedure.query(async ({ ctx }) => {
-    const user = await ctx.db.user.findUnique({
-      where: { id: ctx.session.user.id },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        timezone: true,
-        avatar: true,
-        bio: true,
-        createdAt: true,
-      },
-    });
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
-      });
-    }
-
-    return user;
-  }),
 });
